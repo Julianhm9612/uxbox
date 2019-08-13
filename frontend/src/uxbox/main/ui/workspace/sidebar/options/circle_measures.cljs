@@ -100,7 +100,7 @@
   (let [value (dom/event->value event)
         value (parse-int value 0)
         sid (:id shape)]
-    (st/emit! (uds/update-rotation sid value))))
+    (st/emit! (udw/update-shape-attrs sid {:rotation value}))))
 
 (defn- on-position-change
   [event shape attr]

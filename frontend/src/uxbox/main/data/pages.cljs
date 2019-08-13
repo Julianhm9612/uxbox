@@ -106,6 +106,7 @@
   (let [page (get-in state [:pages id])
         shapes (pack-page-shapes state page)]
     (-> page
+        (assoc-in [:data :canvas] (vec (:canvas page)))
         (assoc-in [:data :shapes] (vec (:shapes page)))
         (assoc-in [:data :shapes-map] shapes)
         (dissoc :shapes))))
@@ -116,8 +117,10 @@
   [state {:keys [id data] :as page}]
   (let [shapes (:shapes data)
         shapes-map (:shapes-map data)
+        canvas (:canvas data [])
         page (-> page
                  (dissoc :data)
+                 (assoc :canvas canvas)
                  (assoc :shapes shapes))]
     (-> state
         (update :shapes merge shapes-map)

@@ -12,7 +12,7 @@
    [uxbox.builtins.icons :as i]
    [uxbox.main.data.pages :as udp]
    [uxbox.main.data.shapes :as uds]
-   [uxbox.main.data.workspace :as udw]
+   [uxbox.main.data.workspace :as dw]
    [uxbox.main.refs :as refs]
    [uxbox.main.store :as st]
    [uxbox.main.ui.keyboard :as kbd]
@@ -46,7 +46,7 @@
                         parent (.-parentNode target)
                         name (dom/get-value target)]
                     (set! (.-draggable parent) true)
-                    (st/emit! (uds/rename-shape (:id shape) name))
+                    (st/emit! (dw/rename-shape (:id shape) name))
                     (swap! local assoc :edition false)))
         on-key-down (fn [event]
                       (js/console.log event)
@@ -88,7 +88,7 @@
                 (st/emit! (uds/show-shape id))
                 (st/emit! (uds/hide-shape id)))
               (when (contains? selected id)
-                (st/emit! (udw/select-shape id)))))
+                (st/emit! (dw/select-shape id)))))
 
           (select-shape [event]
             (dom/prevent-default event)
@@ -99,24 +99,20 @@
                 nil
 
                 (.-ctrlKey event)
-                (st/emit! (udw/select-shape id))
+                (st/emit! (dw/select-shape id))
 
                 (> (count selected) 1)
-                (st/emit! (udw/deselect-all)
-                          (udw/select-shape id))
-
-                (contains? selected id)
-                (st/emit! (udw/select-shape id))
-
+                (st/emit! (dw/deselect-all)
+                          (dw/select-shape id))
                 :else
-                (st/emit! (udw/deselect-all)
-                          (udw/select-shape id)))))
+                (st/emit! (dw/deselect-all)
+                          (dw/select-shape id)))))
 
           (on-drop [item monitor]
             (st/emit! (udp/persist-page (:page shape))))
 
           (on-hover [item monitor]
-            (st/emit! (udw/change-shape-order {:id (:shape-id item)
+            (st/emit! (dw/change-shape-order {:id (:shape-id item)
                                                :index index})))]
     (let [selected? (contains? selected (:id shape))
           [dprops dnd-ref] (use-sortable
@@ -165,7 +161,7 @@
 
 (mf/defc layers-toolbox
   [{:keys [page selected] :as props}]
-  (let [on-click #(st/emit! (udw/toggle-flag :layers))
+  (let [on-click #(st/emit! (dw/toggle-flag :layers))
         selected (mf/deref refs/selected-shapes)]
     [:div#layers.tool-window
      [:div.tool-window-bar

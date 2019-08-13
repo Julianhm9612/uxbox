@@ -58,7 +58,8 @@
         (and (not selected?) (empty? selected))
         (do
           (dom/stop-propagation event)
-          (st/emit! (dw/select-shape id)
+          (st/emit! (dw/deselect-all)
+                    (dw/select-shape id)
                     (start-move-selected)))
 
         (and (not selected?) (not (empty? selected)))

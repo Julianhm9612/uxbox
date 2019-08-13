@@ -16,8 +16,8 @@
    [uxbox.main.data.lightbox :as udl]
    [uxbox.main.data.pages :as udp]
    [uxbox.main.data.projects :as dp]
-   [uxbox.main.data.shapes :as uds]
-   [uxbox.main.data.shapes-impl :as simpl]
+   [uxbox.main.data.shapes :as ds]
+   [uxbox.main.data.shapes-impl :as dsi]
    [uxbox.main.data.workspace.ruler :as wruler]
    [uxbox.main.geom :as geom]
    [uxbox.main.lenses :as ul]
@@ -258,7 +258,7 @@
                      (->> (:clipboard state)
                           (filter #(= id (:id %)))
                           (first)))]
-      (simpl/duplicate-shapes state (:items selected) page-id))))
+      (dsi/duplicate-shapes state (:items selected) page-id))))
 
 (defn paste-from-clipboard
   "Copy selected shapes to clipboard."
@@ -328,17 +328,40 @@
   (InitializeAlignment. id))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Shapes on Workspace events
+;; Shapes events
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn add-shape
+  [data]
+  {:pre [(us/valid? ::ds/shape data)]}
+  (reify
+    udp/IPageUpdate
+    ptk/UpdateEvent
+    (update [_ state]
+      ;; TODO: revisit the `setup-proportions` seems unnecesary
+      (let [shape (assoc (geom/setup-proportions data)
+                         :id (uuid/random))
+            pid (get-in state [:workspace :current])]
+        (dsi/assoc-shape-to-page state shape pid)))))
+
+(defn delete-shape
+  [id]
+  {:pre [(uuid? id)]}
+  (reify
+    udp/IPageUpdate
+    ptk/UpdateEvent
+    (update [_ state]
+      (let [shape (get-in state [:shapes id])]
+        (dsi/dissoc-shape state shape)))))
 
 (defrecord SelectShape [id]
   ptk/UpdateEvent
   (update [_ state]
-    (let [page-id (get-in state [:workspace :current])
-          selected (get-in state [:workspace page-id :selected])]
+    (let [pid (get-in state [:workspace :current])
+          selected (get-in state [:workspace pid :selected])]
       (if (contains? selected id)
-        (update-in state [:workspace page-id :selected] disj id)
-        (update-in state [:workspace page-id :selected] conj id))))
+        (update-in state [:workspace pid :selected] disj id)
+        (update-in state [:workspace pid :selected] conj id))))
 
   ptk/WatchEvent
   (watch [_ state s]
@@ -353,9 +376,10 @@
 (defrecord DeselectAll []
   ptk/UpdateEvent
   (update [_ state]
-    (let [page-id (get-in state [:workspace :current])]
-      (assoc-in state [:workspace page-id :selected] #{})))
-
+    (let [pid (get-in state [:workspace :current])]
+      (update-in state [:workspace pid] #(-> %
+                                             (assoc :selected #{})
+                                             (dissoc :selected-canvas)))))
   ptk/WatchEvent
   (watch [_ state stream]
     (rx/just :interrupt)))
@@ -388,7 +412,7 @@
     (update [_ state]
       (let [pid (get-in state [:workspace :current])
             selrect (get-in state [:workspace pid :selrect])
-            shapes (simpl/match-by-selrect state pid selrect)]
+            shapes (dsi/match-by-selrect state pid selrect)]
         (assoc-in state [:workspace pid :selected] shapes)))))
 
 ;; --- Update Shape Attrs
@@ -400,8 +424,8 @@
 
 (defn update-shape-attrs
   [id attrs]
-  {:pre [(uuid? id) (us/valid? ::uds/attributes attrs)]}
-  (let [atts (us/extract attrs ::uds/attributes)]
+  {:pre [(uuid? id) (us/valid? ::ds/attributes attrs)]}
+  (let [atts (us/extract attrs ::ds/attributes)]
     (UpdateShapeAttrs. id attrs)))
 
 ;; --- Update Selected Shapes attrs
@@ -416,7 +440,7 @@
 
 (defn update-selected-shapes-attrs
   [attrs]
-  {:pre [(us/valid? ::uds/attributes attrs)]}
+  {:pre [(us/valid? ::ds/attributes attrs)]}
   (UpdateSelectedShapesAttrs. attrs))
 
 
@@ -486,7 +510,7 @@
   (update [_ state]
     (let [id (get-in state [:workspace :current])
           selected (get-in state [:workspace id :selected])]
-      (simpl/move-layer state selected loc))))
+      (dsi/move-layer state selected loc))))
 
 (defn move-selected-layer
   [loc]
@@ -495,18 +519,27 @@
 
 ;; --- Delete Selected
 
-(defrecord DeleteSelected []
-  ptk/WatchEvent
-  (watch [_ state stream]
-    (let [id (get-in state [:workspace :current])
-          selected (get-in state [:workspace id :selected])]
-      (rx/from-coll
-       (into [(deselect-all)] (map #(uds/delete-shape %) selected))))))
-
-(defn delete-selected
+(def delete-selected
   "Deselect all and remove all selected shapes."
-  []
-  (DeleteSelected.))
+  (reify
+    ptk/WatchEvent
+    (watch [_ state stream]
+      (let [id (get-in state [:workspace :current])
+            selected (get-in state [:workspace id :selected])]
+        (rx/from-coll
+         (into [(deselect-all)] (map #(delete-shape %) selected)))))))
+
+
+;; --- Rename Shape
+
+(defn rename-shape
+  [id name]
+  {:pre [(uuid? id) (string? name)]}
+  (reify
+    udp/IPageUpdate
+    ptk/UpdateEvent
+    (update [_ state]
+      (assoc-in state [:shapes id :name] name))))
 
 ;; --- Change Shape Order (Ordering)
 
@@ -563,7 +596,7 @@
     (let [pid (get-in state [:workspace :current])
           displacement (get-in state [:workspace pid :modifiers id :displacement])]
       (if (gmt/matrix? displacement)
-        (rx/of #(simpl/materialize-xfmt % id displacement)
+        (rx/of #(dsi/materialize-xfmt % id displacement)
                #(update-in % [:workspace pid :modifiers id] dissoc :displacement)
                ::udp/page-update)
         (rx/empty)))))
@@ -595,7 +628,7 @@
     (let [pid (get-in state [:workspace :current])
           resize (get-in state [:workspace pid :modifiers id :resize])]
       (if (gmt/matrix? resize)
-        (rx/of #(simpl/materialize-xfmt % id resize)
+        (rx/of #(dsi/materialize-xfmt % id resize)
                #(update-in % [:workspace pid :modifiers id] dissoc :resize)
                ::udp/page-update)
         (rx/empty)))))
@@ -661,6 +694,20 @@
            :x2 end-x
            :y2 end-y
            :type :rect)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Canvas Interactions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn select-canvas
+  [id]
+  (reify
+    ptk/UpdateEvent
+    (update [_ state]
+      (let [pid (get-in state [:workspace :current])]
+        (update-in state [:workspace pid] assoc :selected-canvas id)))))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Server Interactions

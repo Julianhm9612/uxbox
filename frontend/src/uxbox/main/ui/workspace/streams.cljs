@@ -52,21 +52,7 @@
   (and (mouse-event? v)
        (= :click (:type v))))
 
-(defrecord PointerEvent [window
-                         viewport
-                         ctrl
-                         shift])
-
-(defn pointer-event
-  [window viewport ctrl shift]
-  {:pre [(gpt/point? window)
-         (gpt/point? viewport)
-         (boolean? ctrl)
-         (boolean? shift)]}
-  (PointerEvent. window
-                 viewport
-                 ctrl
-                 shift))
+(defrecord PointerEvent [source pt ctrl shift])
 
 (defn pointer-event?
   [v]
@@ -98,16 +84,20 @@
   (rx/filter pointer-event? st/stream))
 
 (defonce viewport-mouse-position
-  (let [sub (rx/behavior-subject nil)]
-    (-> (rx/map :viewport mouse-position)
-        (rx/subscribe-with sub))
+  (let [sub (rx/behavior-subject nil)
+        ob  (->> st/stream
+                 (rx/filter pointer-event?)
+                 (rx/filter #(= :viewport (:source %)))
+                 (rx/map :pt)
+                 )]
+    (rx/subscribe-with ob sub)
     sub))
 
-(defonce window-mouse-position
-  (let [sub (rx/behavior-subject nil)]
-    (-> (rx/map :window mouse-position)
-        (rx/subscribe-with sub))
-    sub))
+;; (defonce window-mouse-position
+;;   (let [sub (rx/behavior-subject nil)]
+;;     (-> (rx/map :window mouse-position)
+;;         (rx/subscribe-with sub))
+;;     sub))
 
 (defonce mouse-position-ctrl
   (let [sub (rx/behavior-subject nil)]

@@ -46,7 +46,7 @@
    :ctrl+e #(st/emit! (dw/select-for-drawing wsd/+draw-tool-circle+))
    :ctrl+t #(st/emit! (dw/select-for-drawing wsd/+draw-tool-text+))
    :esc #(st/emit! (dw/deselect-all))
-   :delete #(st/emit! (dw/delete-selected))
+   :delete #(st/emit! dw/delete-selected)
    :ctrl+up #(st/emit! (dw/move-selected-layer :up))
    :ctrl+down #(st/emit! (dw/move-selected-layer :down))
    :ctrl+shift+up #(st/emit! (dw/move-selected-layer :top))

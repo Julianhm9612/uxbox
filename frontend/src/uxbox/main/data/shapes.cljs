@@ -57,12 +57,7 @@
 (s/def ::y2 number?)
 (s/def ::id uuid?)
 (s/def ::page uuid?)
-(s/def ::type #{:rect
-                :group
-                :path
-                :circle
-                :image
-                :text})
+(s/def ::type #{:rect :path :circle :image :text})
 
 (s/def ::attributes
   (s/keys :opt-un [::fill-color
@@ -93,36 +88,6 @@
 
 (s/def ::rect-like-shape
   (s/keys :req-un [::x1 ::y1 ::x2 ::y2 ::type]))
-
-;; --- Shapes CRUD
-
-(deftype AddShape [data]
-  udp/IPageUpdate
-  ptk/UpdateEvent
-  (update [_ state]
-    (let [shape (geom/setup-proportions data)
-          page-id (get-in state [:workspace :current])]
-      (impl/assoc-shape-to-page state shape page-id))))
-
-(defn add-shape
-  [data]
-  {:pre [(us/valid? ::shape data)]}
-  (AddShape. data))
-
-;; --- Delete Shape
-
-(deftype DeleteShape [id]
-  udp/IPageUpdate
-  ptk/UpdateEvent
-  (update [_ state]
-    (let [shape (get-in state [:shapes id])]
-      (impl/dissoc-shape state shape))))
-
-(defn delete-shape
-  "Remove the shape using its id."
-  [id]
-  {:pre [(uuid? id)]}
-  (DeleteShape. id))
 
 ;; --- Rename Shape
 

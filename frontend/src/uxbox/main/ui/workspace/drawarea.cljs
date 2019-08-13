@@ -275,10 +275,11 @@
              #(update-in % [:workspace pid :modifiers] dissoc (:id shape))
 
              ;; Unselect the drawing tool
+             ;; TODO; maybe a specific event for clear draw-tool
              #(update-in % [:workspace pid] dissoc :drawing :drawing-tool)
 
              ;; Add & select the cred shape to the workspace
-             (ds/add-shape shape)
+             (dw/add-shape shape)
              (dw/select-first-shape)))
           (rx/of #(update-in % [:workspace pid] dissoc :drawing :drawing-tool)))))))
 

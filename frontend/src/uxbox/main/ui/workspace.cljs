@@ -62,7 +62,7 @@
 
 (defn- subscribe
   [canvas page]
-  (scroll/scroll-to-page-center (mf/ref-node canvas) page)
+  ;; (scroll/scroll-to-page-center (mf/ref-node canvas) page)
   (st/emit! (udp/watch-page-changes (:id page))
             (udu/watch-page-changes (:id page)))
   (let [sub (shortcuts/init)]
@@ -83,8 +83,8 @@
                  :no-tool-bar-left (not left-sidebar?)
                  :scrolling (:viewport-positionig workspace))]
 
-    (mf/use-effect {:deps #js [canvas page]
-                    :fn #(subscribe canvas page)})
+    (mf/use-effect #(subscribe canvas page)
+                   #js [(:id page)])
     [:*
      (messages-widget)
      [:& header {:page page
