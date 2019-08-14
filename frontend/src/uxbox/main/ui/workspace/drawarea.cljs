@@ -114,11 +114,11 @@
               stoper (->> (rx/filter #(or (uws/mouse-up? %) (= % :interrupt)) stream)
                           (rx/take 1))
 
-              mouse (->> uws/viewport-mouse-position
+              mouse (->> uws/mouse-position
                          (rx/mapcat #(conditional-align % align?))
                          (rx/with-latest vector uws/mouse-position-ctrl))]
           (rx/concat
-           (->> uws/viewport-mouse-position
+           (->> uws/mouse-position
                 (rx/take 1)
                 (rx/mapcat #(conditional-align % align?))
                 (rx/map (fn [pt] #(initialize-drawing % pt))))
@@ -166,12 +166,12 @@
               flags (get-in state [:workspace pid :flags])
               align? (refs/alignment-activated? flags)
 
-              last-point (volatile! @uws/viewport-mouse-position)
+              last-point (volatile! @uws/mouse-position)
 
               stoper (->> (rx/filter stoper-event? stream)
                           (rx/take 1))
 
-              mouse (->> (rx/sample 10 uws/viewport-mouse-position)
+              mouse (->> (rx/sample 10 uws/mouse-position)
                          (rx/mapcat #(conditional-align % align?)))
 
               points (->> stream
@@ -249,7 +249,7 @@
               stoper (->> (rx/filter stoper-event? stream)
                           (rx/take 1))
 
-              mouse (->> (rx/sample 10 uws/viewport-mouse-position)
+              mouse (->> (rx/sample 10 uws/mouse-position)
                          (rx/mapcat #(conditional-align % align?)))]
           (rx/concat
            (rx/of initialize-drawing)

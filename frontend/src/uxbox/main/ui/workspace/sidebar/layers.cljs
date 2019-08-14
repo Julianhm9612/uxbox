@@ -11,7 +11,6 @@
    [rumext.alpha :as mf]
    [uxbox.builtins.icons :as i]
    [uxbox.main.data.pages :as udp]
-   [uxbox.main.data.shapes :as uds]
    [uxbox.main.data.workspace :as dw]
    [uxbox.main.refs :as refs]
    [uxbox.main.store :as st]
@@ -77,16 +76,16 @@
             (let [id (:id shape)
                   blocked? (:blocked shape)]
               (if blocked?
-                (st/emit! (uds/unblock-shape id))
-                (st/emit! (uds/block-shape id)))))
+                (st/emit! (dw/unblock-shape id))
+                (st/emit! (dw/block-shape id)))))
 
           (toggle-visibility [event]
             (dom/stop-propagation event)
             (let [id (:id shape)
                   hidden? (:hidden shape)]
               (if hidden?
-                (st/emit! (uds/show-shape id))
-                (st/emit! (uds/hide-shape id)))
+                (st/emit! (dw/show-shape id))
+                (st/emit! (dw/hide-shape id)))
               (when (contains? selected id)
                 (st/emit! (dw/select-shape id)))))
 

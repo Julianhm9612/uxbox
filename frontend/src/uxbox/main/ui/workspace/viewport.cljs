@@ -37,7 +37,7 @@
 
 (mf/defc coordinates
   [{:keys [zoom] :as props}]
-  (let [coords (some-> (use-rxsub uws/viewport-mouse-position)
+  (let [coords (some-> (use-rxsub uws/mouse-position)
                        (gpt/divide zoom)
                        (gpt/round 0))]
     [:ul.coordinates
@@ -60,16 +60,16 @@
     :circle "Drag to draw a Circle"
     nil))
 
-(mf/defc cursor-tooltip
-  {:wrap [mf/wrap-memo]}
-  [{:keys [tooltip]}]
-  (let [coords (mf/deref refs/window-mouse-position)]
-    [:span.cursor-tooltip
-     {:style
-      {:position "fixed"
-       :left (str (+ (:x coords) 5) "px")
-       :top (str (- (:y coords) 25) "px")}}
-     tooltip]))
+;; (mf/defc cursor-tooltip
+;;   {:wrap [mf/wrap-memo]}
+;;   [{:keys [tooltip]}]
+;;   (let [coords (mf/deref refs/window-mouse-position)]
+;;     [:span.cursor-tooltip
+;;      {:style
+;;       {:position "fixed"
+;;        :left (str (+ (:x coords) 5) "px")
+;;        :top (str (- (:y coords) 25) "px")}}
+;;      tooltip]))
 
 ;; --- Selection Rect
 
@@ -93,7 +93,7 @@
                                     (rx/filter uws/mouse-up? stream))
                           (rx/take 1))]
           (rx/concat
-           (->> uws/viewport-mouse-position
+           (->> uws/mouse-position
                 (rx/map (fn [pos] #(update-state % pos)))
                 (rx/take-until stoper))
            (rx/of (dw/deselect-all)
@@ -125,9 +125,9 @@
       ptk/EffectEvent
       (effect [_ state stream]
         (let [stoper (rx/filter #(= ::finish-positioning %) stream)
-              reference @uws/viewport-mouse-position
+              reference @uws/mouse-position
               dom (dom/get-element "workspace-viewport")]
-          (-> (rx/take-until stoper uws/viewport-mouse-position)
+          (-> (rx/take-until stoper uws/mouse-position)
               (rx/subscribe #(on-point dom reference %))))))))
 
 ;; --- Viewport
@@ -248,7 +248,7 @@
 
       [:*
        [:& coordinates {:zoom zoom}]
-       [:div.tooltip-container
+       #_[:div.tooltip-container
         (when tooltip
           [:& cursor-tooltip {:tooltip tooltip}])]
        [:svg.viewport {:width (* c/viewport-width zoom)

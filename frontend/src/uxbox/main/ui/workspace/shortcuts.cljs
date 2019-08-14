@@ -12,7 +12,6 @@
             [uxbox.main.store :as st]
             [uxbox.main.data.lightbox :as dl]
             [uxbox.main.data.workspace :as dw]
-            [uxbox.main.data.shapes :as uds]
             [uxbox.main.data.undo :as udu]
             [uxbox.main.data.history :as udh]
             [uxbox.main.ui.workspace.sidebar.drawtools :as wsd])
@@ -27,15 +26,13 @@
 
 (defonce +shortcuts+
   {:shift+g #(st/emit! (dw/toggle-flag :grid))
-   :ctrl+g #(st/emit! (uds/group-selected))
-   :ctrl+shift+g #(st/emit! (uds/ungroup-selected))
    :ctrl+shift+m #(st/emit! (dw/toggle-flag :sitemap))
    :ctrl+shift+f #(st/emit! (dw/toggle-flag :drawtools))
    :ctrl+shift+i #(st/emit! (dw/toggle-flag :icons))
    :ctrl+shift+l #(st/emit! (dw/toggle-flag :layers))
    :ctrl+0 #(st/emit! (dw/reset-zoom))
    :ctrl+r #(st/emit! (dw/toggle-flag :ruler))
-   :ctrl+d #(st/emit! (uds/duplicate-selected))
+   :ctrl+d #(st/emit! dw/duplicate-selected)
    :ctrl+c #(st/emit! (dw/copy-to-clipboard))
    :ctrl+v #(st/emit! (dw/paste-from-clipboard))
    :ctrl+shift+v #(dl/open! :clipboard)

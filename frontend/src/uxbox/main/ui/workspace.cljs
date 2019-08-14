@@ -52,7 +52,7 @@
     (let [prev-zoom @refs/selected-zoom
           dom (mf/ref-node canvas)
           scroll-position (scroll/get-current-position-absolute dom)
-          mouse-point @uws/viewport-mouse-position]
+          mouse-point @uws/mouse-position]
       (dom/prevent-default event)
       (dom/stop-propagation event)
       (if (pos? (.-deltaY event))

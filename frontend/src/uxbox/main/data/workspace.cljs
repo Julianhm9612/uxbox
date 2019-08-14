@@ -13,14 +13,11 @@
    [uxbox.main.constants :as c]
    [uxbox.main.data.history :as udh]
    [uxbox.main.data.icons :as udi]
-   [uxbox.main.data.lightbox :as udl]
    [uxbox.main.data.pages :as udp]
    [uxbox.main.data.projects :as dp]
    [uxbox.main.data.shapes :as ds]
-   [uxbox.main.data.shapes-impl :as dsi]
-   [uxbox.main.data.workspace.ruler :as wruler]
+   ;; [uxbox.main.data.workspace.ruler :as wruler]
    [uxbox.main.geom :as geom]
-   [uxbox.main.lenses :as ul]
    [uxbox.main.refs :as refs]
    [uxbox.main.store :as st]
    [uxbox.main.workers :as uwrk]
@@ -35,8 +32,8 @@
 
 ;; --- Expose inner functions
 
-(def start-ruler wruler/start-ruler)
-(def clear-ruler wruler/clear-ruler)
+(def start-ruler nil)
+(def clear-ruler nil)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; General workspace events
@@ -258,7 +255,7 @@
                      (->> (:clipboard state)
                           (filter #(= id (:id %)))
                           (first)))]
-      (dsi/duplicate-shapes state (:items selected) page-id))))
+      (ds/duplicate-shapes state (:items selected) page-id))))
 
 (defn paste-from-clipboard
   "Copy selected shapes to clipboard."
@@ -327,6 +324,16 @@
   {:pre [(uuid? id)]}
   (InitializeAlignment. id))
 
+;; --- Duplicate Selected
+
+(def duplicate-selected
+  (reify
+    udp/IPageUpdate
+    ptk/UpdateEvent
+    (update [_ state]
+      (let [selected (get-in state [:workspace :selected])]
+        (ds/duplicate-shapes state selected)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Shapes events
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -342,7 +349,7 @@
       (let [shape (assoc (geom/setup-proportions data)
                          :id (uuid/random))
             pid (get-in state [:workspace :current])]
-        (dsi/assoc-shape-to-page state shape pid)))))
+        (ds/assoc-shape-to-page state shape pid)))))
 
 (defn delete-shape
   [id]
@@ -352,7 +359,7 @@
     ptk/UpdateEvent
     (update [_ state]
       (let [shape (get-in state [:shapes id])]
-        (dsi/dissoc-shape state shape)))))
+        (ds/dissoc-shape state shape)))))
 
 (defrecord SelectShape [id]
   ptk/UpdateEvent
@@ -412,7 +419,7 @@
     (update [_ state]
       (let [pid (get-in state [:workspace :current])
             selrect (get-in state [:workspace pid :selrect])
-            shapes (dsi/match-by-selrect state pid selrect)]
+            shapes (ds/match-by-selrect state pid selrect)]
         (assoc-in state [:workspace pid :selected] shapes)))))
 
 ;; --- Update Shape Attrs
@@ -510,12 +517,26 @@
   (update [_ state]
     (let [id (get-in state [:workspace :current])
           selected (get-in state [:workspace id :selected])]
-      (dsi/move-layer state selected loc))))
+      (ds/move-layer state selected loc))))
 
 (defn move-selected-layer
   [loc]
   {:pre [(us/valid? ::direction loc)]}
   (MoveSelectedLayer. loc))
+
+;; --- Update Shape Position
+
+(deftype UpdateShapePosition [id point]
+  udp/IPageUpdate
+  ptk/UpdateEvent
+  (update [_ state]
+    (update-in state [:shapes id] geom/absolute-move point)))
+
+(defn update-position
+  "Update the start position coordenate of the shape."
+  [id point]
+  {:pre [(uuid? id) (gpt/point? point)]}
+  (UpdateShapePosition. id point))
 
 ;; --- Delete Selected
 
@@ -528,7 +549,6 @@
             selected (get-in state [:workspace id :selected])]
         (rx/from-coll
          (into [(deselect-all)] (map #(delete-shape %) selected)))))))
-
 
 ;; --- Rename Shape
 
@@ -596,7 +616,7 @@
     (let [pid (get-in state [:workspace :current])
           displacement (get-in state [:workspace pid :modifiers id :displacement])]
       (if (gmt/matrix? displacement)
-        (rx/of #(dsi/materialize-xfmt % id displacement)
+        (rx/of #(ds/materialize-xfmt % id displacement)
                #(update-in % [:workspace pid :modifiers id] dissoc :displacement)
                ::udp/page-update)
         (rx/empty)))))
@@ -628,7 +648,7 @@
     (let [pid (get-in state [:workspace :current])
           resize (get-in state [:workspace pid :modifiers id :resize])]
       (if (gmt/matrix? resize)
-        (rx/of #(dsi/materialize-xfmt % id resize)
+        (rx/of #(ds/materialize-xfmt % id resize)
                #(update-in % [:workspace pid :modifiers id] dissoc :resize)
                ::udp/page-update)
         (rx/empty)))))
@@ -674,6 +694,230 @@
                      :drawing shape
                      :drawing-tool shape))))))
 
+;; --- Shape Proportions
+
+(deftype LockShapeProportions [id]
+  ptk/UpdateEvent
+  (update [_ state]
+    (let [[width height] (-> (get-in state [:shapes id])
+                             (geom/size)
+                             (keep [:width :height]))
+          proportion (/ width height)]
+      (update-in state [:shapes id] assoc
+                 :proportion proportion
+                 :proportion-lock true))))
+
+(defn lock-proportions
+  "Mark proportions of the shape locked and save the current
+  proportion as additional precalculated property."
+  [id]
+  {:pre [(uuid? id)]}
+  (LockShapeProportions. id))
+
+(deftype UnlockShapeProportions [id]
+  udp/IPageUpdate
+  ptk/UpdateEvent
+  (update [_ state]
+    (assoc-in state [:shapes id :proportion-lock] false)))
+
+(defn unlock-proportions
+  [id]
+  {:pre [(uuid? id)]}
+  (UnlockShapeProportions. id))
+
+;; --- Update Dimensions
+
+(deftype UpdateDimensions [id dimensions]
+  udp/IPageUpdate
+  ptk/UpdateEvent
+  (update [_ state]
+    (update-in state [:shapes id] geom/resize-dim dimensions)))
+
+(s/def ::update-dimensions-opts
+  (s/keys :opt-un [::width ::height]))
+
+(defn update-dimensions
+  "A helper event just for update the position
+  of the shape using the width and height attrs
+  instread final point of coordinates."
+  [id opts]
+  {:pre [(uuid? id) (us/valid? ::update-dimensions-opts opts)]}
+  (UpdateDimensions. id opts))
+
+;; --- Update Interaction
+
+(deftype UpdateInteraction [shape interaction]
+  udp/IPageUpdate
+  ptk/UpdateEvent
+  (update [_ state]
+    (let [id (or (:id interaction)
+                 (uuid/random))
+          data (assoc interaction :id id)]
+      (assoc-in state [:shapes shape :interactions id] data))))
+
+(defn update-interaction
+  [shape interaction]
+  (UpdateInteraction. shape interaction))
+
+;; --- Delete Interaction
+
+(deftype DeleteInteracton [shape id]
+  udp/IPageUpdate
+  ptk/UpdateEvent
+  (update [_ state]
+    (update-in state [:shapes shape :interactions] dissoc id)))
+
+(defn delete-interaction
+  [shape id]
+  {:pre [(uuid? id) (uuid? shape)]}
+  (DeleteInteracton. shape id))
+
+;; --- Path Modifications
+
+(deftype UpdatePath [id index delta]
+  ptk/UpdateEvent
+  (update [_ state]
+    (update-in state [:shapes id :segments index] gpt/add delta)))
+
+(defn update-path
+  "Update a concrete point in the path shape."
+  [id index delta]
+  {:pre [(uuid? id) (number? index) (gpt/point? delta)]}
+  (UpdatePath. id index delta))
+
+;; --- Initial Path Point Alignment
+
+(deftype InitialPathPointAlign [id index]
+  ptk/WatchEvent
+  (watch [_ state s]
+    (let [shape (get-in state [:shapes id])
+          point (get-in shape [:segments index])]
+      (->> (uwrk/align-point point)
+           (rx/map #(update-path id index %))))))
+
+(defn initial-path-point-align
+  "Event responsible of align a specified point of the
+  shape by `index` with the grid."
+  [id index]
+  {:pre [(uuid? id)
+         (number? index)
+         (not (neg? index))]}
+  (InitialPathPointAlign. id index))
+
+;; --- Shape Visibility
+
+(deftype HideShape [id]
+  udp/IPageUpdate
+  ptk/UpdateEvent
+  (update [_ state]
+    (letfn [(mark-hidden [state id]
+              (let [shape (get-in state [:shapes id])]
+                (if (= :group (:type shape))
+                  (as-> state $
+                    (assoc-in $ [:shapes id :hidden] true)
+                    (reduce mark-hidden $ (:items shape)))
+                  (assoc-in state [:shapes id :hidden] true))))]
+      (mark-hidden state id))))
+
+(defn hide-shape
+  [id]
+  {:pre [(uuid? id)]}
+  (HideShape. id))
+
+(deftype ShowShape [id]
+  udp/IPageUpdate
+  ptk/UpdateEvent
+  (update [_ state]
+    (letfn [(mark-visible [state id]
+              (let [shape (get-in state [:shapes id])]
+                (if (= :group (:type shape))
+                  (as-> state $
+                    (assoc-in $ [:shapes id :hidden] false)
+                    (reduce mark-visible $ (:items shape)))
+                  (assoc-in state [:shapes id :hidden] false))))]
+      (mark-visible state id))))
+
+(defn show-shape
+  [id]
+  {:pre [(uuid? id)]}
+  (ShowShape. id))
+
+;; --- Shape Blocking
+
+(deftype BlockShape [id]
+  udp/IPageUpdate
+  ptk/UpdateEvent
+  (update [_ state]
+    (letfn [(mark-blocked [state id]
+              (let [shape (get-in state [:shapes id])]
+                (if (= :group (:type shape))
+                  (as-> state $
+                    (assoc-in $ [:shapes id :blocked] true)
+                    (reduce mark-blocked $ (:items shape)))
+                  (assoc-in state [:shapes id :blocked] true))))]
+      (mark-blocked state id))))
+
+(defn block-shape
+  [id]
+  {:pre [(uuid? id)]}
+  (BlockShape. id))
+
+(deftype UnblockShape [id]
+  udp/IPageUpdate
+  ptk/UpdateEvent
+  (update [_ state]
+    (letfn [(mark-unblocked [state id]
+              (let [shape (get-in state [:shapes id])]
+                (if (= :group (:type shape))
+                  (as-> state $
+                    (assoc-in $ [:shapes id :blocked] false)
+                    (reduce mark-unblocked $ (:items shape)))
+                  (assoc-in state [:shapes id :blocked] false))))]
+      (mark-unblocked state id))))
+
+(defn unblock-shape
+  [id]
+  {:pre [(uuid? id)]}
+  (UnblockShape. id))
+
+;; --- Shape Locking
+
+(deftype LockShape [id]
+  udp/IPageUpdate
+  ptk/UpdateEvent
+  (update [_ state]
+    (letfn [(mark-locked [state id]
+              (let [shape (get-in state [:shapes id])]
+                (if (= :group (:type shape))
+                  (as-> state $
+                    (assoc-in $ [:shapes id :locked] true)
+                    (reduce mark-locked $ (:items shape)))
+                  (assoc-in state [:shapes id :locked] true))))]
+      (mark-locked state id))))
+
+(defn lock-shape
+  [id]
+  {:pre [(uuid? id)]}
+  (LockShape. id))
+
+(deftype UnlockShape [id]
+  udp/IPageUpdate
+  ptk/UpdateEvent
+  (update [_ state]
+    (letfn [(mark-unlocked [state id]
+              (let [shape (get-in state [:shapes id])]
+                (if (= :group (:type shape))
+                  (as-> state $
+                    (assoc-in $ [:shapes id :locked] false)
+                    (reduce mark-unlocked $ (:items shape)))
+                  (assoc-in state [:shapes id :locked] false))))]
+      (mark-unlocked state id))))
+
+(defn unlock-shape
+  [id]
+  {:pre [(uuid? id)]}
+  (UnlockShape. id))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Selection Rect IMPL
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -699,6 +943,30 @@
 ;; Canvas Interactions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; ;; --- Group Collapsing
+
+;; (deftype CollapseGroupShape [id]
+;;   udp/IPageUpdate
+;;   ptk/UpdateEvent
+;;   (update [_ state]
+;;     (update-in state [:shapes id] assoc :collapsed true)))
+
+;; (defn collapse-shape
+;;   [id]
+;;   {:pre [(uuid? id)]}
+;;   (CollapseGroupShape. id))
+
+;; (deftype UncollapseGroupShape [id]
+;;   udp/IPageUpdate
+;;   ptk/UpdateEvent
+;;   (update [_ state]
+;;     (update-in state [:shapes id] assoc :collapsed false)))
+
+;; (defn uncollapse-shape
+;;   [id]
+;;   {:pre [(uuid? id)]}
+;;   (UncollapseGroupShape. id))
+
 (defn select-canvas
   [id]
   (reify
@@ -706,8 +974,6 @@
     (update [_ state]
       (let [pid (get-in state [:workspace :current])]
         (update-in state [:workspace pid] assoc :selected-canvas id)))))
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Server Interactions

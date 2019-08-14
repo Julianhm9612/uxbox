@@ -5,18 +5,16 @@
 ;; Copyright (c) 2015-2017 Andrey Antukh <niwi@niwi.nz>
 
 (ns uxbox.main.data.pages
-  (:require [cljs.spec.alpha :as s]
-            [cuerdas.core :as str]
-            [beicon.core :as rx]
-            [lentes.core :as l]
-            [potok.core :as ptk]
-            [uxbox.main.store :as st]
-            [uxbox.main.repo :as rp]
-            [uxbox.main.lenses :as ul]
-            [uxbox.util.spec :as us]
-            [uxbox.util.router :as r]
-            [uxbox.util.timers :as ts]
-            [uxbox.util.time :as dt]))
+  (:require
+   [beicon.core :as rx]
+   [cljs.spec.alpha :as s]
+   [cuerdas.core :as str]
+   [lentes.core :as l]
+   [potok.core :as ptk]
+   [uxbox.main.repo :as rp]
+   [uxbox.main.store :as st]
+   [uxbox.util.spec :as us]
+   [uxbox.util.timers :as ts]))
 
 ;; --- Specs
 

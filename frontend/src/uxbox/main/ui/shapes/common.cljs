@@ -25,7 +25,7 @@
     (watch [_ state stream]
       (let [pid (get-in state [:workspace :current])
             wst (get-in state [:workspace pid])
-            stoper (->> ws/interaction-events
+            stoper (->> stream
                         (rx/filter ws/mouse-up?)
                         (rx/take 1))
             stream (->> ws/mouse-position-deltas

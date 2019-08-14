@@ -76,14 +76,7 @@
 
 ;; --- Derived streams
 
-;; TODO: this shoul be DEPRECATED
-(defonce interaction-events
-  (rx/filter interaction-event? st/stream))
-
 (defonce mouse-position
-  (rx/filter pointer-event? st/stream))
-
-(defonce viewport-mouse-position
   (let [sub (rx/behavior-subject nil)
         ob  (->> st/stream
                  (rx/filter pointer-event?)
@@ -93,12 +86,6 @@
     (rx/subscribe-with ob sub)
     sub))
 
-;; (defonce window-mouse-position
-;;   (let [sub (rx/behavior-subject nil)]
-;;     (-> (rx/map :window mouse-position)
-;;         (rx/subscribe-with sub))
-;;     sub))
-
 (defonce mouse-position-ctrl
   (let [sub (rx/behavior-subject nil)]
     (-> (rx/map :ctrl mouse-position)
@@ -106,7 +93,7 @@
     sub))
 
 (defonce mouse-position-deltas
-  (->> viewport-mouse-position
+  (->> mouse-position
        (rx/sample 10)
        (rx/map #(gpt/divide % @refs/selected-zoom))
        (rx/mapcat (fn [point]
