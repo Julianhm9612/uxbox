@@ -89,15 +89,13 @@
     (reify
       ptk/WatchEvent
       (watch [_ state stream]
-        (let [stoper (->> (rx/merge (rx/filter #(= % :interrupt) stream)
-                                    (rx/filter uws/mouse-up? stream))
-                          (rx/take 1))]
+        (let [stoper (rx/filter #(or (dw/interrupt? %) (uws/mouse-up? %)) stream)]
           (rx/concat
+           (rx/of (dw/deselect-all))
            (->> uws/mouse-position
                 (rx/map (fn [pos] #(update-state % pos)))
                 (rx/take-until stoper))
-           (rx/of (dw/deselect-all)
-                  dw/select-shapes-by-current-selrect
+           (rx/of dw/select-shapes-by-current-selrect
                   clear-state)))))))
 
 (mf/defc selrect
@@ -263,6 +261,8 @@
                        :on-mouse-up on-mouse-up}
         [:g.zoom {:transform (str "scale(" zoom ", " zoom ")")}
          (when page
+           ;; (prn "selected:" (:selected wst))
+
            [:*
             (for [item (:canvas page)]
               [:& canvas {:key (:id item)

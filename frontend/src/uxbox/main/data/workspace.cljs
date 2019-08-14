@@ -7,6 +7,7 @@
 (ns uxbox.main.data.workspace
   (:require
    [beicon.core :as rx]
+   ;; [uxbox.main.data.workspace.ruler :as wruler]
    [cljs.spec.alpha :as s]
    [potok.core :as ptk]
    [uxbox.config :as cfg]
@@ -16,12 +17,11 @@
    [uxbox.main.data.pages :as udp]
    [uxbox.main.data.projects :as dp]
    [uxbox.main.data.shapes :as ds]
-   ;; [uxbox.main.data.workspace.ruler :as wruler]
    [uxbox.main.geom :as geom]
    [uxbox.main.refs :as refs]
    [uxbox.main.store :as st]
    [uxbox.main.workers :as uwrk]
-   [uxbox.util.data :refer [dissoc-in index-of]]
+   [uxbox.util.data :refer [dissoc-in index-of seek]]
    [uxbox.util.forms :as sc]
    [uxbox.util.geom.matrix :as gmt]
    [uxbox.util.geom.point :as gpt]
@@ -34,6 +34,8 @@
 
 (def start-ruler nil)
 (def clear-ruler nil)
+
+(defn interrupt? [e] (= e :interrupt))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; General workspace events
@@ -680,19 +682,28 @@
 
 ;; --- Select for Drawing
 
-(defn select-for-drawing
-  [shape]
+(def clear-drawing
   (reify
     ptk/UpdateEvent
     (update [_ state]
-      (let [pid (get-in state [:workspace :current])
-            current (get-in state [:workspace pid :drawing-tool])]
-        (if (or (nil? shape)
-                (= shape current))
-          (update-in state [:workspace pid] dissoc :drawing :drawing-tool)
-          (update-in state [:workspace pid] assoc
-                     :drawing shape
-                     :drawing-tool shape))))))
+      (let [pid (get-in state [:workspace :current])]
+        (update-in state [:workspace pid] dissoc :drawing-tool :drawing)))))
+
+(defn select-for-drawing?
+  [e]
+  (= (::type (meta e)) ::select-for-drawing))
+
+(defn select-for-drawing
+  [tool]
+  (reify
+    IMeta
+    (-meta [_] {::type ::select-for-drawing})
+
+    ptk/UpdateEvent
+    (update [_ state]
+      (prn "select-for-drawing" tool)
+      (let [pid (get-in state [:workspace :current])]
+        (update-in state [:workspace pid] assoc :drawing-tool tool)))))
 
 ;; --- Shape Proportions
 

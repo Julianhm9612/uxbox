@@ -28,6 +28,7 @@
 (s/def ::letter-spacing number?)
 (s/def ::line-height number?)
 (s/def ::locked boolean?)
+(s/def ::name string?)
 (s/def ::page uuid?)
 (s/def ::proportion number?)
 (s/def ::proportion-lock boolean?)
@@ -70,8 +71,11 @@
                    ::x1 ::x2
                    ::y1 ::y2]))
 
+(s/def ::minimal-shape
+  (s/keys ::req-un [::id ::page ::type ::name]))
+
 (s/def ::shape
-  (s/merge (s/keys ::req-un [::id ::page ::type]) ::attributes))
+  (s/merge ::minimal-shape ::attributes))
 
 (s/def ::rect-like-shape
   (s/keys :req-un [::x1 ::y1 ::x2 ::y2 ::type]))

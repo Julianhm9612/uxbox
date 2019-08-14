@@ -169,7 +169,7 @@
             (let [stoper? #(and (ws/mouse-event? %) (= (:type %) :up))]
               (rx/merge
                (rx/filter stoper? st/stream)
-               (->> stream
+               (->> st/stream
                     (rx/filter #(= % :interrupt))
                     (rx/take 1)))))
 

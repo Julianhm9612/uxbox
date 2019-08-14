@@ -12,9 +12,7 @@
             [uxbox.main.store :as st]
             [uxbox.main.data.lightbox :as dl]
             [uxbox.main.data.workspace :as dw]
-            [uxbox.main.data.undo :as udu]
-            [uxbox.main.data.history :as udh]
-            [uxbox.main.ui.workspace.sidebar.drawtools :as wsd])
+            [uxbox.main.data.undo :as du])
   (:import goog.events.EventType
            goog.events.KeyCodes
            goog.ui.KeyboardShortcutHandler
@@ -36,12 +34,12 @@
    :ctrl+c #(st/emit! (dw/copy-to-clipboard))
    :ctrl+v #(st/emit! (dw/paste-from-clipboard))
    :ctrl+shift+v #(dl/open! :clipboard)
-   :ctrl+z #(st/emit! (udu/undo))
-   :ctrl+shift+z #(st/emit! (udu/redo))
-   :ctrl+y #(st/emit! (udu/redo))
-   :ctrl+b #(st/emit! (dw/select-for-drawing wsd/+draw-tool-rect+))
-   :ctrl+e #(st/emit! (dw/select-for-drawing wsd/+draw-tool-circle+))
-   :ctrl+t #(st/emit! (dw/select-for-drawing wsd/+draw-tool-text+))
+   :ctrl+z #(st/emit! (du/undo))
+   :ctrl+shift+z #(st/emit! (du/redo))
+   :ctrl+y #(st/emit! (du/redo))
+   :ctrl+b #(st/emit! (dw/select-for-drawing :rect))
+   :ctrl+e #(st/emit! (dw/select-for-drawing :circle))
+   :ctrl+t #(st/emit! (dw/select-for-drawing :text))
    :esc #(st/emit! (dw/deselect-all))
    :delete #(st/emit! dw/delete-selected)
    :ctrl+up #(st/emit! (dw/move-selected-layer :up))
