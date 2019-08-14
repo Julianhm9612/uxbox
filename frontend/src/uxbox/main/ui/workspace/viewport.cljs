@@ -261,16 +261,9 @@
                        :on-mouse-up on-mouse-up}
         [:g.zoom {:transform (str "scale(" zoom ", " zoom ")")}
          (when page
-           ;; (prn "selected:" (:selected wst))
-
            [:*
-            (for [item (:canvas page)]
-              [:& canvas {:key (:id item)
-                          :id (:id item)
-                          :x (:x item)
-                          :y (:y item)
-                          :width (:width item)
-                          :height (:height item)}])
+            (for [id (:canvas page)]
+              [:& canvas {:key id :id id}])
 
             (for [id (reverse (:shapes page))]
               [:& uus/shape-component {:id id :key id}])

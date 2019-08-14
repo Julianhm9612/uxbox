@@ -37,7 +37,12 @@
    {:icon i/pencil
     :help "ds.help.curve"
     :type :curve
-    :priority 6}])
+    :priority 6}
+   ;; TODO: we need an icon for canvas creation
+   {:icon i/box
+    :help "ds.help.canvas"
+    :type :canvas
+    :priority 7}])
 
 ;; --- Draw Toolbox (Component)
 
@@ -72,9 +77,9 @@
               :on-click #(select % (:type item))}
              (:icon item)]))
 
-        [:div.tool-btn.tooltip.tooltip-hover
-         {:alt (tr "ds.help.ruler")
-          :on-click toggle-ruler
-          :class (when (contains? flags :ruler) "selected")}
-         i/ruler-tool]]])))
+        #_[:div.tool-btn.tooltip.tooltip-hover
+           {:alt (tr "ds.help.ruler")
+            :on-click toggle-ruler
+            :class (when (contains? flags :ruler) "selected")}
+           i/ruler-tool]]])))
 

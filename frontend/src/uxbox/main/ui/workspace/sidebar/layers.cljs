@@ -139,20 +139,52 @@
         [:div.element-icon (element-icon shape)]
         [:& layer-name {:shape shape}]]])))
 
+
+;; --- Layer Canvas
+
+;; (mf/defc layer-canvas
+;;   [{:keys [canvas selected index] :as props}]
+;;   (letfn [(select-shape [event]
+;;             (dom/prevent-default event)
+;;             (st/emit! (dw/select-canvas (:id canvas))))
+;;     (let [selected? (contains? selected (:id shape))]
+;;       [:li {:class (classnames
+;;                     :selected selected?)}
+;;        [:div.element-list-body {:class (classnames :selected selected?)
+;;                                 :on-click select-shape
+;;                                 :on-double-click #(dom/stop-propagation %)
+;;                                 :draggable true}
+;;         [:div.element-actions
+;;          [:div.toggle-element {:class (when-not (:hidden shape) "selected")
+;;                                :on-click toggle-visibility}
+;;           i/eye]
+;;          [:div.block-element {:class (when (:blocked shape) "selected")
+;;                               :on-click toggle-blocking}
+;;           i/lock]]
+;;         [:div.element-icon (element-icon shape)]
+;;         [:& layer-name {:shape shape}]]])))
+
 ;; --- Layers List
 
 (def ^:private shapes-iref
   (-> (l/key :shapes)
       (l/derive st/state)))
 
+(def ^:private canvas-iref
+  (-> (l/key :canvas)
+      (l/derive st/state)))
+
 (mf/defc layers-list
   [{:keys [shapes selected] :as props}]
-  (let [shapes-map (mf/deref shapes-iref)]
+  (let [shapes-map (mf/deref shapes-iref)
+        canvas-map (mf/deref canvas-iref)
+        selected-shapes (mf/deref refs/selected-shapes)
+        selected-canvas (mf/deref refs/selected-canvas)]
     [:div.tool-window-content
      [:ul.element-list
       (for [[index id] (map-indexed vector shapes)]
         [:& layer-item {:shape (get shapes-map id)
-                        :selected selected
+                        :selected selected-shapes
                         :index index
                         :key id}])]]))
 

@@ -52,6 +52,10 @@
   (-> (l/key :selected)
       (l/derive workspace)))
 
+(def selected-canvas
+  (-> (l/key :selected-canvas)
+      (l/derive workspace)))
+
 (def toolboxes
   (-> (l/key :toolboxes)
       (l/derive workspace)))

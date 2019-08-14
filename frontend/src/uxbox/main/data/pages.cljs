@@ -14,7 +14,8 @@
    [uxbox.main.repo :as rp]
    [uxbox.main.store :as st]
    [uxbox.util.spec :as us]
-   [uxbox.util.timers :as ts]))
+   [uxbox.util.timers :as ts]
+   [uxbox.util.data :refer [index-by-id]]))
 
 ;; --- Specs
 
@@ -75,53 +76,43 @@
 
 ;; --- Helpers
 
-;; TODO: make sure remove all :tmp-* related attrs from shape
-
-(defn pack-page-shapes
-  "Create a hash-map of shapes indexed by their id that belongs
-  to the provided page."
-  [state page]
-  (let [lookup-shape-xf (map #(get-in state [:shapes %]))]
-    (reduce (fn reducer [acc {:keys [id type items] :as shape}]
-              (let [shape (assoc shape :page (:id page))]
-                (cond
-                  (= type :group)
-                  (reduce reducer
-                          (assoc acc id shape)
-                          (sequence lookup-shape-xf items))
-
-                  (uuid? id)
-                  (assoc acc id shape)
-
-                  :else acc)))
-            {}
-            (sequence lookup-shape-xf (:shapes page)))))
-
 (defn pack-page
   "Return a packed version of page object ready
   for send to remore storage service."
   [state id]
-  (let [page (get-in state [:pages id])
-        shapes (pack-page-shapes state page)]
-    (-> page
-        (assoc-in [:data :canvas] (vec (:canvas page)))
-        (assoc-in [:data :shapes] (vec (:shapes page)))
-        (assoc-in [:data :shapes-map] shapes)
-        (dissoc :shapes))))
+  (letfn [(get-shape [id]
+            (get-in state [:shapes id]))
+          (pack-shapes [ids]
+            (reduce #(assoc %1 %2 (get-shape %2)) {} ids))
+          (pack-canvas [ids]
+            (mapv #(get-in state [:canvas %]) ids))]
+    (let [page (get-in state [:pages id])
+          data {:canvas (pack-canvas (:canvas page))
+                :shapes (vec (:shapes page))
+                :shapes-map (pack-shapes (:shapes page))}]
+      (-> page
+          (assoc :data data)
+          (dissoc :shapes :canvas)))))
 
-(defn assoc-page
+(defn unpack-page
   "Unpacks packed page object and assocs it to the
   provided state."
   [state {:keys [id data] :as page}]
   (let [shapes (:shapes data)
         shapes-map (:shapes-map data)
-        canvas (:canvas data [])
+
+        canvas-data (:canvas data [])
+
+        canvas (mapv :id canvas-data)
+        canvas-map (index-by-id canvas-data)
+
         page (-> page
                  (dissoc :data)
                  (assoc :canvas canvas)
                  (assoc :shapes shapes))]
     (-> state
         (update :shapes merge shapes-map)
+        (update :canvas merge canvas-map)
         (update :pages assoc id page))))
 
 (defn purge-page
@@ -161,7 +152,7 @@
       (assoc-in $ [:projects id :pages] page-ids)
       ;; TODO: this is a workaround
       (assoc-in $ [:projects id :page-id] (first page-ids))
-      (reduce assoc-page $ pages)
+      (reduce unpack-page $ pages)
       (reduce assoc-packed-page $ pages)))))
 
 (defn pages-fetched
@@ -195,7 +186,7 @@
   ptk/UpdateEvent
   (update [_ state]
     (-> state
-        (assoc-page data)
+        (unpack-page data)
         (assoc-packed-page data)))
 
   ptk/WatchEvent

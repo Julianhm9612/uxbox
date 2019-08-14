@@ -26,20 +26,27 @@
   (-> (l/key :selected-canvas)
       (l/derive refs/workspace)))
 
+(defn- make-canvas-iref
+  [id]
+  (-> (l/in [:canvas id])
+      (l/derive st/state)))
+
 (mf/defc canvas
-  [{:keys [id x y width height background] :as props}]
+  [{:keys [id] :as props}]
   (letfn [(on-double-click [event]
             (dom/prevent-default event)
             (st/emit! (dw/select-canvas id)))]
-    (let [selected (mf/deref selected-canvas)
+    (let [canvas-iref (mf/use-memo #(make-canvas-iref id) #js [id])
+          canvas (mf/deref canvas-iref)
+          selected (mf/deref selected-canvas)
           selected? (= id selected)]
       [:rect.page-canvas
-       {:x x
+       {:x (:x canvas)
         :class (when selected? "selected")
-        :y y
-        :fill (or background "#ffffff")
-        :width width
-        :height height
+        :y (:y canvas)
+        :fill (:background canvas "#ffffff")
+        :width (:width canvas)
+        :height (:height canvas)
         :on-double-click on-double-click}])))
 
 
